@@ -1,5 +1,6 @@
 package readly
 
+//go:generate curl google.com > test.html
 import (
 	"io"
 	"io/ioutil"
@@ -8,7 +9,10 @@ import (
 	"regexp"
 )
 
-var httpClient *http.Client
+// Reader holds state for Readly
+type Reader struct {
+	Client *http.Client
+}
 
 // Credit to http://play.golang.org/p/ps7PXFRI2B
 type nopReader struct{}
@@ -20,26 +24,20 @@ func isHTTP(file string) bool {
 	return http.MatchString(file)
 }
 
-// SetClient will force the local http client instance to use
-func SetClient(c *http.Client) {
-	httpClient = c
-}
-
-func client() *http.Client {
-	var nilClient *http.Client
-	if httpClient == nilClient {
-		httpClient = &http.Client{}
+// New will return an instance of Readly
+func New() *Reader {
+	return &Reader{
+		Client: &http.Client{},
 	}
-	return httpClient
 }
 
 // Reader will return an io.ReadCloser for either a file or http(s) URL
-func Reader(file string) (io.ReadCloser, error) {
+func (readly *Reader) Reader(file string) (io.ReadCloser, error) {
 	// TODO: Error wrapping
 	// TODO: timeout?
 	nilReaderCloser := ioutil.NopCloser(&nopReader{})
 	if isHTTP(file) {
-		resp, err := client().Get(file)
+		resp, err := readly.Client.Get(file)
 		if err != nil {
 			return nilReaderCloser, err
 		}
@@ -54,8 +52,8 @@ func Reader(file string) (io.ReadCloser, error) {
 }
 
 // Read will take a file or http(s) URL, read all contents and return them
-func Read(file string) (string, error) {
-	r, err := Reader(file)
+func (readly *Reader) Read(file string) (string, error) {
+	r, err := readly.Reader(file)
 	defer r.Close()
 
 	if err != nil {
